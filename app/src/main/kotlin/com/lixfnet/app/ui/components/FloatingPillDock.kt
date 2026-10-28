@@ -81,7 +81,7 @@ fun FloatingPillDock(
             )
 
             DockItem(
-                label = "Netflix của tôi",
+                label = "Của tôi",
                 icon = if (currentTab == NavTab.MY_NETFLIX) Icons.Filled.Person else Icons.Outlined.Person,
                 isSelected = currentTab == NavTab.MY_NETFLIX,
                 isAvatar = true,

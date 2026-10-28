@@ -541,6 +541,31 @@ class WatchProgressRepository(
         return !exists
     }
 
+    fun removeContinueWatching(movie: Movie) {
+        val currentList = _continueWatching.value.toMutableList()
+        currentList.removeAll { isSameMovie(it, movie) }
+        _continueWatching.value = currentList
+        prefs.edit().putString("watch_progress_list", gson.toJson(currentList)).apply()
+
+        val user = authRepository.currentUser.value
+        if (user != null) {
+            scope.launch {
+                try {
+                    val token = firebaseManager.getAccessToken()
+                    val dbUrl = firebaseManager.getDatabaseUrl()
+                    val targetKey = remoteKeyMap[movie.id] ?: remoteKeyMap[movie.slug] ?: (movie.slug.ifBlank { movie.id }).replace(Regex("[/\\.#$\\[\\]]"), "_")
+                    val delReq = Request.Builder()
+                        .url("$dbUrl/lixfnet/users/${user.username}/watchProgress/$targetKey.json?access_token=$token")
+                        .delete()
+                        .build()
+                    httpClient.newCall(delReq).execute()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     private fun parseMovieFromJson(obj: JsonObject): Movie {
         val genres = obj.getAsJsonArray("genres")?.map { it.asString } ?: emptyList()
         val cast = obj.getAsJsonArray("cast")?.map { it.asString } ?: emptyList()

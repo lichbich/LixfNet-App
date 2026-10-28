@@ -1,8 +1,8 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1",
-  "title": "LixfNet v1.1 - Cập nhật tính năng mới",
-  "changelog": "• Bổ sung tính năng tự động cập nhật trong app\n• Khắc phục hoàn toàn lỗi nhân đôi phim danh sách Tiếp tục xem\n• Cải thiện hiệu năng phát video mượt mà hơn",
-  "apkUrl": "https://github.com/lichbich/LixfNet-App/releases/download/v1.1/LixfNet-v1.1.apk",
+  "versionCode": 3,
+  "versionName": "1.2",
+  "title": "LixfNet v1.2 - Giao diện Của tôi chuẩn Netflix",
+  "changelog": "• Thiết kế lại tab Của tôi chuẩn giao diện Netflix hiện đại\n• Đưa danh sách Tiếp tục xem lên đầu với nút phát và tùy chọn nhanh\n• Hỗ trợ chia sẻ phim và tối ưu trải nghiệm người dùng",
+  "apkUrl": "https://github.com/lichbich/LixfNet-App/releases/download/v1.2/LixfNet-v1.2.apk",
   "forceUpdate": false
 }

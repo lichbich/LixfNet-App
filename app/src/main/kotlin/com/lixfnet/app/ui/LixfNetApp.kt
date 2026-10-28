@@ -157,7 +157,8 @@ fun LixfNetApp() {
                 NavTab.MY_NETFLIX -> MyNetflixScreen(
                     watchRepo = watchProgressRepository,
                     authRepository = authRepository,
-                    onMovieClick = { movie -> activeMovie = movie }
+                    onMovieClick = { movie -> activeMovie = movie },
+                    onPlayMovie = { movie -> playMovie(movie) }
                 )
             }
         }
