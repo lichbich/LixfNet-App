@@ -54,7 +54,7 @@ fun AppUpdateDialog() {
         onDismissRequest = {
             if (updateState is UpdateUiState.UpdateAvailable) {
                 val info = (updateState as UpdateUiState.UpdateAvailable).updateInfo
-                if (!info.forceUpdate) AppUpdateManager.dismiss()
+                if (!info.forceUpdate) AppUpdateManager.dismiss(context, info)
             } else if (updateState is UpdateUiState.Error) {
                 AppUpdateManager.dismiss()
             }
@@ -246,7 +246,7 @@ fun AppUpdateDialog() {
                         ) {
                             if (!state.updateInfo.forceUpdate) {
                                 TextButton(
-                                    onClick = { AppUpdateManager.dismiss() },
+                                    onClick = { AppUpdateManager.dismiss(context, state.updateInfo) },
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(text = "Để sau", color = Color(0xFFAAAAAA))

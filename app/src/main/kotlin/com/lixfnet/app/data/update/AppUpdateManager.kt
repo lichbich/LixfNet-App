@@ -100,7 +100,13 @@ object AppUpdateManager {
                         localName = currentName
                     )
 
-                    if (isNewer && updateInfo.apkUrl.isNotBlank()) {
+                    val isDismissed = if (!isManual && !updateInfo.forceUpdate) {
+                        val prefs = context.getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+                        val dismissedName = prefs.getString("dismissed_version_name", "") ?: ""
+                        dismissedName.equals(updateInfo.versionName.trim().trimStart('v', 'V'), ignoreCase = true)
+                    } else false
+
+                    if (isNewer && !isDismissed && updateInfo.apkUrl.isNotBlank()) {
                         _updateState.value = UpdateUiState.UpdateAvailable(updateInfo)
                     } else {
                         _updateState.value = if (isManual) {
@@ -199,9 +205,21 @@ object AppUpdateManager {
         localCode: Int,
         localName: String
     ): Boolean {
-        if (remoteCode > localCode) return true
-        if (remoteCode < localCode) return false
-        return compareSemVer(remoteName, localName) > 0
+        val cleanRemote = remoteName.trim().trimStart('v', 'V').trim()
+        val cleanLocal = localName.trim().trimStart('v', 'V').trim()
+
+        // If version names match exactly (e.g. 1.1 == 1.1), it is already installed!
+        if (cleanRemote.equals(cleanLocal, ignoreCase = true)) {
+            return false
+        }
+
+        // SemVer check
+        val semVerDiff = compareSemVer(cleanRemote, cleanLocal)
+        if (semVerDiff > 0) return true
+        if (semVerDiff < 0) return false
+
+        // Fallback to versionCode
+        return remoteCode > localCode
     }
 
     private fun compareSemVer(v1: String, v2: String): Int {
@@ -343,7 +361,13 @@ object AppUpdateManager {
         }
     }
 
-    fun dismiss() {
+    fun dismiss(context: Context? = null, updateInfo: AppUpdateInfo? = null) {
         _updateState.value = UpdateUiState.Idle
+        if (context != null && updateInfo != null) {
+            val prefs = context.getSharedPreferences("app_update_prefs", Context.MODE_PRIVATE)
+            prefs.edit()
+                .putString("dismissed_version_name", updateInfo.versionName.trim().trimStart('v', 'V'))
+                .apply()
+        }
     }
 }
