@@ -40,6 +40,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -91,10 +94,40 @@ fun CinemaPlayerScreen(
     val previousEpisode = if (currentIndex > 0) movie.episodes[currentIndex - 1] else null
     val nextEpisode = if (currentIndex in 0 until movie.episodes.size - 1) movie.episodes[currentIndex + 1] else null
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     // Single persistent ExoPlayer instance for the entire cinema session
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
+        }
+    }
+
+    // Immediate progress flush helper
+    val flushSave: () -> Unit = {
+        val pos = exoPlayer.currentPosition.coerceAtLeast(0L) / 1000L
+        val dur = exoPlayer.duration.coerceAtLeast(1L) / 1000L
+        if (pos > 0L) {
+            watchRepo.flushProgress(
+                movie = movie,
+                episodeTitle = currentEpisode.name,
+                currentSec = pos,
+                totalSec = dur,
+                episodeM3u8 = currentEpisode.linkM3u8
+            )
+        }
+    }
+
+    // App Lifecycle observation: Flush when app goes to background / paused
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                flushSave()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -103,6 +136,9 @@ fun CinemaPlayerScreen(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                if (!playing) {
+                    flushSave()
+                }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -114,6 +150,7 @@ fun CinemaPlayerScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
+            flushSave()
             exoPlayer.removeListener(listener)
             exoPlayer.release()
         }
@@ -163,8 +200,9 @@ fun CinemaPlayerScreen(
         }
     }
 
-    // Periodic time & watch progress update loop (every 1 second)
+    // Periodic time & watch progress update loop (every 1 second local, 30 seconds cloud heartbeat)
     LaunchedEffect(exoPlayer, currentEpisode) {
+        var loopCount = 0
         while (isActive) {
             currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
             val d = exoPlayer.duration
@@ -176,14 +214,17 @@ fun CinemaPlayerScreen(
                 showNextEpisodeCard = true
             }
 
-            // Save watch progress to local cache and Firebase RTDB
+            // Save watch progress to local cache (every 1s) and Firebase RTDB heartbeat (every 30s)
             if (currentPosition > 0) {
+                loopCount++
+                val syncToCloud = (loopCount % 30 == 0)
                 watchRepo.saveProgress(
                     movie = movie,
                     episodeTitle = currentEpisode.name,
                     currentSec = currentPosition / 1000,
                     totalSec = duration / 1000,
-                    episodeM3u8 = currentEpisode.linkM3u8
+                    episodeM3u8 = currentEpisode.linkM3u8,
+                    syncToCloud = syncToCloud
                 )
             }
 
@@ -370,6 +411,7 @@ fun CinemaPlayerScreen(
 
                         Button(
                             onClick = {
+                                flushSave()
                                 currentEpisode = next
                                 onSelectEpisode(next)
                                 showNextEpisodeCard = false
@@ -470,7 +512,10 @@ fun CinemaPlayerScreen(
                             .align(Alignment.TopCenter),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            flushSave()
+                            onBack()
+                        }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Thoát",
@@ -694,6 +739,7 @@ fun CinemaPlayerScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable(enabled = previousEpisode != null) {
                                             previousEpisode?.let { prev ->
+                                                flushSave()
                                                 currentEpisode = prev
                                                 onSelectEpisode(prev)
                                             }
@@ -722,6 +768,7 @@ fun CinemaPlayerScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable(enabled = nextEpisode != null) {
                                             nextEpisode?.let { next ->
+                                                flushSave()
                                                 currentEpisode = next
                                                 onSelectEpisode(next)
                                             }
@@ -893,6 +940,7 @@ fun CinemaPlayerScreen(
                                             shape = RoundedCornerShape(8.dp)
                                         )
                                         .clickable {
+                                            flushSave()
                                             currentEpisode = ep
                                             onSelectEpisode(ep)
                                             showEpisodesSheet = false

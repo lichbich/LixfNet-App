@@ -1,0 +1,8 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0",
+  "title": "LixfNet v1.0",
+  "changelog": "• Cập nhật giao diện phong cách Netflix cao cấp\n• Sửa lỗi đồng bộ tiến trình xem và trùng lặp phim\n• Hỗ trợ tính năng tự động kiểm tra và cập nhật ứng dụng",
+  "apkUrl": "https://github.com/lichbich/LixfNet-App/releases/download/v1.0/LixfNet-v1.0.apk",
+  "forceUpdate": false
+}

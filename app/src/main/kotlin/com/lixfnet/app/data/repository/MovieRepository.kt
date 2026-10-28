@@ -1,20 +1,36 @@
 package com.lixfnet.app.data.repository
 
+import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.lixfnet.app.data.api.ApiClient
 import com.lixfnet.app.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.Calendar
+import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
-class MovieRepository {
+class MovieRepository(private val context: Context? = null) {
     private val api = ApiClient.kkPhimApi
     private val webApi = ApiClient.lixfNetWebApi
+    private val gson = Gson()
+    private val prefs = context?.getSharedPreferences("lixfnet_top10_cache", Context.MODE_PRIVATE)
 
     // In-memory cache for fast instant UI loading
     private var cachedHero: Movie? = null
     private var cachedChinaSlugs: Set<String> = emptySet()
     private var lastChinaFetchTime: Long = 0
+
+    // Top 10 Weekly Cache
+    private var cachedSeriesTop10: List<Movie>? = null
+    private var cachedFilmsTop10: List<Movie>? = null
+    private var cachedWeekId: String = ""
+    private var nextTuesdayExpiry: Long = 0L
 
     /**
      * Fetches Chinese movie slugs to filter out Chinese content from home pools
@@ -228,28 +244,221 @@ class MovieRepository {
     }
 
     /**
+     * Calculates timestamp of the next official Netflix Tudum Tuesday release (20:00 UTC / 03:00 AM Wed VN).
+     */
+    fun getNextTuesdayUpdateTimestamp(): Long {
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK) // Sunday = 1, Tuesday = 3
+        var daysUntilTuesday = (Calendar.TUESDAY - dayOfWeek + 7) % 7
+        if (daysUntilTuesday == 0 && cal.get(Calendar.HOUR_OF_DAY) >= 20) {
+            daysUntilTuesday = 7
+        }
+        cal.add(Calendar.DAY_OF_MONTH, daysUntilTuesday)
+        cal.set(Calendar.HOUR_OF_DAY, 20)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    private fun loadTop10FromPrefs() {
+        if (prefs == null) return
+        val expiry = prefs.getLong("top10_next_tuesday_expiry", 0L)
+        val now = System.currentTimeMillis()
+        if (expiry > now) {
+            nextTuesdayExpiry = expiry
+            cachedWeekId = prefs.getString("top10_week_id", "") ?: ""
+            val seriesJson = prefs.getString("top10_series_cache", null)
+            val filmsJson = prefs.getString("top10_films_cache", null)
+            val type = object : TypeToken<List<Movie>>() {}.type
+            if (!seriesJson.isNullOrBlank()) {
+                try {
+                    cachedSeriesTop10 = gson.fromJson(seriesJson, type)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            if (!filmsJson.isNullOrBlank()) {
+                try {
+                    cachedFilmsTop10 = gson.fromJson(filmsJson, type)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    private fun saveTop10ToPrefs(series: List<Movie>, films: List<Movie>, weekId: String, expiry: Long) {
+        cachedSeriesTop10 = series
+        cachedFilmsTop10 = films
+        cachedWeekId = weekId
+        nextTuesdayExpiry = expiry
+        prefs?.edit()
+            ?.putString("top10_series_cache", gson.toJson(series))
+            ?.putString("top10_films_cache", gson.toJson(films))
+            ?.putString("top10_week_id", weekId)
+            ?.putLong("top10_next_tuesday_expiry", expiry)
+            ?.apply()
+    }
+
+    private suspend fun fetchTudumDirect(): Pair<List<String>, List<String>>? = withContext(Dispatchers.IO) {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            .build()
+        try {
+            val tvReq = Request.Builder()
+                .url("https://www.netflix.com/tudum/top10/vietnam/tv")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .build()
+            val filmsReq = Request.Builder()
+                .url("https://www.netflix.com/tudum/top10/vietnam")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .build()
+            val tvRes = client.newCall(tvReq).execute()
+            val filmsRes = client.newCall(filmsReq).execute()
+            if (!tvRes.isSuccessful || !filmsRes.isSuccessful) return@withContext null
+            val tvHtml = tvRes.body?.string() ?: ""
+            val filmsHtml = filmsRes.body?.string() ?: ""
+            val regex = Regex("alt=\"([^\"]+)\"\\s+class=\"[^\"]*cache-[^\"]*\"")
+            val series = regex.findAll(tvHtml).map { it.groupValues[1].trim() }.take(10).toList()
+            val films = regex.findAll(filmsHtml).map { it.groupValues[1].trim() }.take(10).toList()
+            if (series.size >= 5 && films.size >= 5) {
+                Pair(series, films)
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun enrichTop10Titles(titles: List<String>, isSeries: Boolean): List<Movie> = withContext(Dispatchers.IO) {
+        titles.mapIndexed { index, rawTitle ->
+            val cleanTitle = StreamingPlatformData.cleanTudumTitle(rawTitle)
+            val dictEntry = StreamingPlatformData.findTudumEntry(rawTitle)
+                ?: StreamingPlatformData.findTudumEntry(cleanTitle)
+
+            if (dictEntry != null) {
+                Movie(
+                    id = dictEntry.slug.ifBlank { "netflix-${if (isSeries) "series" else "film"}-${index + 1}" },
+                    title = dictEntry.vietnameseTitle,
+                    subTitle = dictEntry.originalTitle,
+                    slug = dictEntry.slug,
+                    description = "Đang đứng vị trí #${index + 1} trên bảng xếp hạng ${if (isSeries) "Series" else "Phim lẻ"} thịnh hành tại Việt Nam tuần này.",
+                    posterUrl = dictEntry.posterUrl,
+                    backdropUrl = dictEntry.posterUrl,
+                    year = dictEntry.year,
+                    quality = "4K Ultra HD",
+                    type = if (isSeries) "series" else "movie",
+                    isTop10 = true,
+                    top10Rank = index + 1,
+                    platform = "netflix",
+                    platformName = "Netflix"
+                )
+            } else {
+                // Dynamic KKPhim search fallback
+                val searchRes = try {
+                    api.searchMovies(keyword = cleanTitle, page = 1).data?.items?.firstOrNull()
+                } catch (e: Exception) {
+                    null
+                }
+
+                if (searchRes != null) {
+                    Movie(
+                        id = searchRes.id ?: searchRes.slug ?: "netflix-${if (isSeries) "series" else "film"}-${index + 1}",
+                        title = searchRes.name ?: cleanTitle,
+                        subTitle = searchRes.originName ?: rawTitle,
+                        slug = searchRes.slug ?: cleanTitle.lowercase().replace(" ", "-"),
+                        description = "Đang đứng vị trí #${index + 1} trên bảng xếp hạng ${if (isSeries) "Series" else "Phim lẻ"} thịnh hành tại Việt Nam tuần này.",
+                        posterUrl = ApiClient.formatImageUrl(searchRes.posterUrl ?: searchRes.thumbUrl),
+                        backdropUrl = ApiClient.formatImageUrl(searchRes.thumbUrl ?: searchRes.posterUrl),
+                        year = searchRes.year ?: 2026,
+                        quality = "4K Ultra HD",
+                        type = if (isSeries) "series" else "movie",
+                        isTop10 = true,
+                        top10Rank = index + 1,
+                        platform = "netflix",
+                        platformName = "Netflix"
+                    )
+                } else {
+                    Movie(
+                        id = "netflix-${if (isSeries) "series" else "film"}-${index + 1}",
+                        title = cleanTitle,
+                        subTitle = rawTitle,
+                        slug = cleanTitle.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'),
+                        description = "Đang đứng vị trí #${index + 1} trên bảng xếp hạng ${if (isSeries) "Series" else "Phim lẻ"} thịnh hành tại Việt Nam tuần này.",
+                        posterUrl = "https://image.tmdb.org/t/p/w500/jzqPdwpiDTPzvnbV0pZzTtOIgWz.jpg",
+                        backdropUrl = "https://image.tmdb.org/t/p/w500/jzqPdwpiDTPzvnbV0pZzTtOIgWz.jpg",
+                        year = 2026,
+                        quality = "4K Ultra HD",
+                        type = if (isSeries) "series" else "movie",
+                        isTop10 = true,
+                        top10Rank = index + 1,
+                        platform = "netflix",
+                        platformName = "Netflix"
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun syncLiveTop10IfNeeded() = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (cachedSeriesTop10 != null && cachedFilmsTop10 != null && now < nextTuesdayExpiry) {
+            return@withContext
+        }
+
+        loadTop10FromPrefs()
+        if (cachedSeriesTop10 != null && cachedFilmsTop10 != null && now < nextTuesdayExpiry) {
+            return@withContext
+        }
+
+        // Fetch fresh weekly data from LixfNet Web API or direct Netflix Tudum
+        var seriesRaw: List<String> = emptyList()
+        var filmsRaw: List<String> = emptyList()
+        var weekId = ""
+
+        try {
+            val liveData = webApi.getNetflixTop10()
+            seriesRaw = liveData.series ?: emptyList()
+            filmsRaw = liveData.films ?: emptyList()
+            weekId = liveData.week ?: ""
+        } catch (e: Exception) {
+            // Direct Tudum fallback
+            val direct = fetchTudumDirect()
+            if (direct != null) {
+                seriesRaw = direct.first
+                filmsRaw = direct.second
+            }
+        }
+
+        val expiry = getNextTuesdayUpdateTimestamp()
+
+        if (seriesRaw.isNotEmpty() && filmsRaw.isNotEmpty()) {
+            val enrichedSeries = enrichTop10Titles(seriesRaw, isSeries = true)
+            val enrichedFilms = enrichTop10Titles(filmsRaw, isSeries = false)
+            saveTop10ToPrefs(enrichedSeries, enrichedFilms, weekId, expiry)
+        }
+    }
+
+    /**
      * Top 10 Series tại Việt Nam tuần này (Netflix Tudum)
+     * Auto-refreshes every Tuesday when Netflix Tudum releases new weekly rankings.
      * Rule ERR-09: Do NOT filter China out of Top 10 Series to preserve official ranks 1..10!
      */
     suspend fun getNetflixSeriesTop10(): List<Movie> = withContext(Dispatchers.IO) {
         try {
-            val tudumList = StreamingPlatformData.NETFLIX_VN_SERIES_TUDUM
-            val liveTitles = try {
-                webApi.getNetflixTop10().series ?: emptyList()
-            } catch (e: Exception) {
-                emptyList()
+            syncLiveTop10IfNeeded()
+            if (!cachedSeriesTop10.isNullOrEmpty()) {
+                return@withContext cachedSeriesTop10!!
             }
 
+            val tudumList = StreamingPlatformData.NETFLIX_VN_SERIES_TUDUM
             return@withContext tudumList.mapIndexed { index, entry ->
-                val displayTitle = if (index < liveTitles.size) {
-                    val liveName = liveTitles[index]
-                    tudumList.find { it.originalTitle.equals(liveName, ignoreCase = true) }?.vietnameseTitle
-                        ?: entry.vietnameseTitle
-                } else entry.vietnameseTitle
-
                 Movie(
                     id = entry.slug.ifBlank { "netflix-series-${index + 1}" },
-                    title = displayTitle,
+                    title = entry.vietnameseTitle,
                     subTitle = entry.originalTitle,
                     slug = entry.slug,
                     description = "Đang đứng vị trí #${index + 1} trên bảng xếp hạng Series thịnh hành tại Việt Nam tuần này.",
@@ -272,9 +481,15 @@ class MovieRepository {
 
     /**
      * Top 10 Phim lẻ tại Việt Nam tuần này (Netflix Tudum)
+     * Auto-refreshes every Tuesday when Netflix Tudum releases new weekly rankings.
      */
     suspend fun getNetflixFilmsTop10(): List<Movie> = withContext(Dispatchers.IO) {
         try {
+            syncLiveTop10IfNeeded()
+            if (!cachedFilmsTop10.isNullOrEmpty()) {
+                return@withContext cachedFilmsTop10!!
+            }
+
             val tudumList = StreamingPlatformData.NETFLIX_VN_FILMS_TUDUM
             return@withContext tudumList.mapIndexed { index, entry ->
                 Movie(

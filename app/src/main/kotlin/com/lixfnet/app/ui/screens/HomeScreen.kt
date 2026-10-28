@@ -52,6 +52,9 @@ fun HomeScreen(
 
     // State collections
     val continueWatching by watchRepo.continueWatching.collectAsState()
+    val distinctContinueWatching = remember(continueWatching) {
+        com.lixfnet.app.data.repository.WatchProgressRepository.deduplicateMovies(continueWatching)
+    }
     val myList by watchRepo.myList.collectAsState()
 
     // Stage 1: Instant Fast Render (~300ms)
@@ -120,14 +123,14 @@ fun HomeScreen(
             .distinctBy { it.slug.orEmpty().ifBlank { it.id.orEmpty() } }
     }
 
-    val tasteProfile = remember(continueWatching) {
-        RecommendationEngine.buildTasteProfile(continueWatching)
+    val tasteProfile = remember(distinctContinueWatching) {
+        RecommendationEngine.buildTasteProfile(distinctContinueWatching)
     }
 
-    val personalizedPicks = remember(tasteProfile, allMoviesPool, continueWatching) {
+    val personalizedPicks = remember(tasteProfile, allMoviesPool, distinctContinueWatching) {
         RecommendationEngine.curatePersonalizedRecommendations(
             allPoolMovies = allMoviesPool,
-            continueWatchingMovies = continueWatching,
+            continueWatchingMovies = distinctContinueWatching,
             profile = tasteProfile,
             limit = 12
         )
@@ -346,11 +349,11 @@ fun HomeScreen(
                 }
 
                 // 4. Continue Watching Row (Tiếp tục xem - Personalized from Firebase)
-                if (continueWatching.isNotEmpty()) {
+                if (distinctContinueWatching.isNotEmpty()) {
                     item {
                         MovieRow(
                             title = "Tiếp tục xem",
-                            movies = continueWatching,
+                            movies = distinctContinueWatching,
                             rowType = RowType.CONTINUE_WATCHING,
                             onMovieClick = onPlayMovie
                         )

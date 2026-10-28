@@ -73,6 +73,15 @@ data class Episode(
     val synopsis: String? = null
 )
 
+data class EpisodeProgress(
+    val currentTime: Long = 0L,
+    val duration: Long = 0L,
+    val progressPercent: Float = 0f,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isCompleted: Boolean = false,
+    val m3u8Url: String = ""
+)
+
 data class WatchProgress(
     val movieId: String,
     val movieSlug: String,
@@ -81,7 +90,8 @@ data class WatchProgress(
     val totalSeconds: Long,
     val progressPercent: Float,
     val episodeM3u8: String = "",
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val episodesProgress: Map<String, EpisodeProgress> = emptyMap()
 )
 
 // --- Raw KKPhim API DTOs ---

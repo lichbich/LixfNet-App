@@ -12,19 +12,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
 import com.lixfnet.app.data.model.Movie
 import com.lixfnet.app.data.repository.WatchProgressRepository
+import com.lixfnet.app.data.update.AppUpdateManager
+import com.lixfnet.app.data.update.UpdateUiState
 import com.lixfnet.app.ui.components.ContinueWatchingCard
 import com.lixfnet.app.ui.components.MovieCard
 import com.lixfnet.app.ui.theme.NetflixBackground
@@ -42,13 +47,33 @@ fun MyNetflixScreen(
     authRepository: com.lixfnet.app.data.repository.AuthRepository,
     onMovieClick: (Movie) -> Unit
 ) {
+    val context = LocalContext.current
     val continueWatching by watchRepo.continueWatching.collectAsState()
+    val distinctContinueWatching = remember(continueWatching) {
+        WatchProgressRepository.deduplicateMovies(continueWatching)
+    }
     val myList by watchRepo.myList.collectAsState()
     val currentUser by authRepository.currentUser.collectAsState()
+    val updateState by AppUpdateManager.updateState.collectAsState()
     var selectedTab by remember { mutableStateOf(MyListTab.MY_LIST) }
+
+    val currentVersion = remember {
+        AppUpdateManager.getCurrentAppVersion(context).second
+    }
 
     LaunchedEffect(Unit) {
         watchRepo.syncWithFirebase()
+    }
+
+    LaunchedEffect(updateState) {
+        if (updateState is UpdateUiState.UpToDate) {
+            Toast.makeText(
+                context,
+                "Bạn đang sử dụng phiên bản mới nhất (v$currentVersion)",
+                Toast.LENGTH_SHORT
+            ).show()
+            AppUpdateManager.dismiss()
+        }
     }
 
     Box(
@@ -99,12 +124,52 @@ fun MyNetflixScreen(
 
                 IconButton(onClick = { authRepository.logout() }) {
                     Icon(
-                        imageVector = Icons.Filled.ExitToApp,
+                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                         contentDescription = "Đăng xuất",
                         tint = Color.White
                     )
                 }
             }
+
+            // App Version & Check Update Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0x1AFFFFFF))
+                    .clickable {
+                        AppUpdateManager.checkForUpdates(context, isManual = true)
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = null,
+                        tint = NetflixRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Phiên bản v$currentVersion",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Text(
+                    text = if (updateState is UpdateUiState.Checking) "Đang kiểm tra..." else "Kiểm tra cập nhật",
+                    color = Color(0xFFAAAAAA),
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Tabs Selector: Danh sách của tôi | Tiếp tục xem
             Row(
@@ -120,7 +185,7 @@ fun MyNetflixScreen(
                 )
 
                 TabPill(
-                    title = "Tiếp tục xem (${continueWatching.size})",
+                    title = "Tiếp tục xem (${distinctContinueWatching.size})",
                     isSelected = selectedTab == MyListTab.CONTINUE_WATCHING,
                     onClick = { selectedTab = MyListTab.CONTINUE_WATCHING }
                 )
@@ -129,7 +194,7 @@ fun MyNetflixScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Content List
-            val displayList = if (selectedTab == MyListTab.MY_LIST) myList else continueWatching
+            val displayList = if (selectedTab == MyListTab.MY_LIST) myList else distinctContinueWatching
 
             if (displayList.isEmpty()) {
                 Box(

@@ -11,5 +11,11 @@
 /build
 /captures
 .externalNativeBuild
-.cxx
 local.properties
+
+# Firebase & Secret Keys
+*firebasekey*.json
+**/firebasekey.json
+google-services.json
+*.keystore
+*.jks

@@ -11,7 +11,7 @@ object ApiClient {
     private const val LIXFNET_WEB_BASE_URL = "https://lixfnet.vercel.app/"
     const val IMAGE_BASE_URL = "https://phimimg.com/"
 
-    private val okHttpClient by lazy {
+    val okHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }

@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 import com.lixfnet.app.data.repository.AuthRepository
 import com.lixfnet.app.data.repository.MovieRepository
 import com.lixfnet.app.data.repository.WatchProgressRepository
+import com.lixfnet.app.data.update.AppUpdateManager
+import com.lixfnet.app.ui.components.AppUpdateDialog
 import com.lixfnet.app.ui.components.FloatingPillDock
 import com.lixfnet.app.ui.components.NavTab
 import com.lixfnet.app.ui.screens.*
@@ -27,9 +29,14 @@ fun LixfNetApp() {
     val context = LocalContext.current
     val firebaseManager = remember { FirebaseManager(context) }
     val authRepository = remember { AuthRepository(context, firebaseManager) }
-    val movieRepository = remember { MovieRepository() }
+    val movieRepository = remember { MovieRepository(context) }
     val watchProgressRepository = remember {
         WatchProgressRepository(context, firebaseManager, authRepository)
+    }
+
+    // Auto-check for app updates on launch
+    LaunchedEffect(Unit) {
+        AppUpdateManager.checkForUpdates(context, isManual = false)
     }
 
     val currentUser by authRepository.currentUser.collectAsState()
@@ -73,7 +80,12 @@ fun LixfNetApp() {
             val resumePos = if (forcedEpisode != null) {
                 val digitsProgress = progress?.episodeTitle?.filter { it.isDigit() } ?: ""
                 val digitsForced = forcedEpisode.name.filter { it.isDigit() }
-                if (progress != null && (
+                val epProgress = progress?.episodesProgress?.get(forcedEpisode.name)
+                    ?: (if (digitsForced.isNotBlank()) progress?.episodesProgress?.get(digitsForced) else null)
+
+                if (epProgress != null && epProgress.currentTime > 0) {
+                    epProgress.currentTime
+                } else if (progress != null && (
                     forcedEpisode.name.equals(progress.episodeTitle, ignoreCase = true) ||
                     forcedEpisode.linkM3u8 == progress.episodeM3u8 ||
                     (digitsForced.isNotBlank() && digitsForced == digitsProgress)
@@ -193,5 +205,8 @@ fun LixfNetApp() {
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
+
+        // In-App Auto Update Dialog Layer
+        AppUpdateDialog()
     }
 }
