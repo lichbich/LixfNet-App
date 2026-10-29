@@ -11,13 +11,28 @@ android {
     applicationId = "com.lixfnet.app"
     minSdk = 26
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.2"
+    versionCode = 4
+    versionName = "1.3"
+  }
+
+  signingConfigs {
+    create("release") {
+      storeFile = file("${rootDir}/release.keystore")
+      storePassword = "lixfnet@2026"
+      keyAlias = "lixfnet_release"
+      keyPassword = "lixfnet@2026"
+      enableV1Signing = true
+      enableV2Signing = true
+      enableV3Signing = true
+      enableV4Signing = false
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
+      isDebuggable = false
+      signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }

@@ -25,6 +25,10 @@ import com.lixfnet.app.data.model.Movie
 import com.lixfnet.app.ui.theme.NetflixDarkCard
 import com.lixfnet.app.ui.theme.NetflixRed
 
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.style.TextAlign
+
 @Composable
 fun ContinueWatchingCard(
     movie: Movie,
@@ -45,12 +49,42 @@ fun ContinueWatchingCard(
                 .clip(cardShape)
                 .background(NetflixDarkCard)
         ) {
-            AsyncImage(
-                model = movie.backdropUrl.orEmpty().ifBlank { movie.posterUrl.orEmpty() },
-                contentDescription = movie.title.orEmpty(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            val imageUrl = movie.backdropUrl.orEmpty().ifBlank { movie.posterUrl.orEmpty() }
+            var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+            if (imageUrl.isNotBlank() && !isImageError) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = movie.title.orEmpty(),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onError = { isImageError = true }
+                )
+            }
+
+            if (isImageError || imageUrl.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2B2B2B), Color(0xFF141414))
+                            )
+                        )
+                        .padding(6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = movie.title.orEmpty(),
+                        color = Color(0xFFDDDDDD),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             // Center semi-transparent Play Icon
             Box(

@@ -63,6 +63,12 @@ interface KKPhimApi {
     suspend fun getMovieDetail(
         @Path("slug") slug: String
     ): KKDetailResponse
+
+    @GET("tmdb/{type}/{id}")
+    suspend fun getMovieByTmdb(
+        @Path("type") type: String,
+        @Path("id") id: Int
+    ): KKDetailResponse
 }
 
 interface LixfNetWebApi {

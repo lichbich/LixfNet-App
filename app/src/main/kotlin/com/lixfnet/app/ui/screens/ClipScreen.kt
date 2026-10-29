@@ -95,12 +95,18 @@ fun ClipFeedItem(
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF161616))
     ) {
-        AsyncImage(
-            model = movie.backdropUrl.ifBlank { movie.posterUrl },
-            contentDescription = movie.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        val imageUrl = movie.backdropUrl.ifBlank { movie.posterUrl }
+        var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+        if (imageUrl.isNotBlank() && !isImageError) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = movie.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onError = { isImageError = true }
+            )
+        }
 
         // Gradient overlay
         Box(

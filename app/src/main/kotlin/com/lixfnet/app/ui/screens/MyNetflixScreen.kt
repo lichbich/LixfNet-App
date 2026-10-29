@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -595,12 +596,42 @@ fun ContinueWatchingNetflixCard(
                 .height(165.dp)
                 .clickable { onPlayClick() }
         ) {
-            AsyncImage(
-                model = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() },
-                contentDescription = movie.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            val imageUrl = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() }
+            var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+            if (imageUrl.isNotBlank() && !isImageError) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = movie.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onError = { isImageError = true }
+                )
+            }
+
+            if (isImageError || imageUrl.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2B2B2B), Color(0xFF141414))
+                            )
+                        )
+                        .padding(6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = movie.title,
+                        color = Color(0xFFDDDDDD),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             // Centered Play Button (Translucent Black Circle with White Border)
             Box(
@@ -778,12 +809,42 @@ fun LikedMovieCard(
                 .height(165.dp)
                 .clickable { onMovieClick() }
         ) {
-            AsyncImage(
-                model = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() },
-                contentDescription = movie.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            val imageUrl = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() }
+            var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+            if (imageUrl.isNotBlank() && !isImageError) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = movie.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onError = { isImageError = true }
+                )
+            }
+
+            if (isImageError || imageUrl.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color(0xFF2B2B2B), Color(0xFF141414))
+                            )
+                        )
+                        .padding(6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = movie.title,
+                        color = Color(0xFFDDDDDD),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
 
         // Share Action Bar
@@ -838,11 +899,41 @@ fun StandardPosterCard(
             .clip(RoundedCornerShape(6.dp))
             .clickable { onClick() }
     ) {
-        AsyncImage(
-            model = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() },
-            contentDescription = movie.title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        val imageUrl = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() }
+        var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+        if (imageUrl.isNotBlank() && !isImageError) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = movie.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onError = { isImageError = true }
+            )
+        }
+
+        if (isImageError || imageUrl.isBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color(0xFF2B2B2B), Color(0xFF141414))
+                        )
+                    )
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = movie.title,
+                    color = Color(0xFFDDDDDD),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }

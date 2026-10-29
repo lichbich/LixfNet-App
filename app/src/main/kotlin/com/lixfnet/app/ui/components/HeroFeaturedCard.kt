@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lixfnet.app.data.model.Movie
 
+import androidx.compose.runtime.*
+
 @Composable
 fun HeroFeaturedCard(
     movie: Movie,
@@ -48,12 +50,18 @@ fun HeroFeaturedCard(
             .clickable { onCardClick() }
     ) {
         // 1. Featured Backdrop / Poster Image
-        AsyncImage(
-            model = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() },
-            contentDescription = movie.title.orEmpty(),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        val imageUrl = movie.posterUrl.orEmpty().ifBlank { movie.backdropUrl.orEmpty() }
+        var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+        if (imageUrl.isNotBlank() && !isImageError) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = movie.title.orEmpty(),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onError = { isImageError = true }
+            )
+        }
 
         // 2. Cinematic Vignette Gradient Overlay
         Box(

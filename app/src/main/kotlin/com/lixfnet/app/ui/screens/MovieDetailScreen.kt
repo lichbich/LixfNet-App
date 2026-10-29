@@ -96,12 +96,18 @@ fun MovieDetailScreen(
                         .background(Color.Black)
                 ) {
                     // Preview image / video still
-                    AsyncImage(
-                        model = fullMovie.backdropUrl.ifBlank { fullMovie.posterUrl },
-                        contentDescription = fullMovie.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    val imageUrl = fullMovie.backdropUrl.ifBlank { fullMovie.posterUrl }
+                    var isImageError by remember(imageUrl) { mutableStateOf(imageUrl.isBlank()) }
+
+                    if (imageUrl.isNotBlank() && !isImageError) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = fullMovie.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            onError = { isImageError = true }
+                        )
+                    }
 
                     // Top Back Arrow
                     IconButton(

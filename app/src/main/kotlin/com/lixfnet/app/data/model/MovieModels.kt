@@ -61,6 +61,47 @@ data class LixfNetTop10Response(
     @SerializedName("source") val source: String?
 )
 
+data class TmdbDetailDto(
+    @SerializedName("id") val id: Int?,
+    @SerializedName("title") val title: String?,
+    @SerializedName("name") val name: String?,
+    @SerializedName("original_title") val originalTitle: String?,
+    @SerializedName("original_name") val originalName: String?,
+    @SerializedName("overview") val overview: String?,
+    @SerializedName("poster_path") val posterPath: String?,
+    @SerializedName("backdrop_path") val backdropPath: String?,
+    @SerializedName("release_date") val releaseDate: String?,
+    @SerializedName("first_air_date") val firstAirDate: String?,
+    @SerializedName("vote_average") val voteAverage: Double?,
+    @SerializedName("genres") val genres: List<TmdbGenreDto>?
+)
+
+data class TmdbGenreDto(
+    @SerializedName("id") val id: Int?,
+    @SerializedName("name") val name: String?
+)
+
+data class TmdbSearchResponse(
+    @SerializedName("page") val page: Int?,
+    @SerializedName("results") val results: List<TmdbSearchItemDto>?
+)
+
+data class TmdbSearchItemDto(
+    @SerializedName("id") val id: Int?,
+    @SerializedName("title") val title: String?,
+    @SerializedName("name") val name: String?,
+    @SerializedName("original_title") val originalTitle: String?,
+    @SerializedName("original_name") val originalName: String?,
+    @SerializedName("overview") val overview: String?,
+    @SerializedName("poster_path") val posterPath: String?,
+    @SerializedName("backdrop_path") val backdropPath: String?,
+    @SerializedName("release_date") val releaseDate: String?,
+    @SerializedName("first_air_date") val firstAirDate: String?,
+    @SerializedName("media_type") val mediaType: String?,
+    @SerializedName("popularity") val popularity: Double?,
+    @SerializedName("vote_average") val voteAverage: Double?
+)
+
 data class Episode(
     val id: String,
     val name: String,

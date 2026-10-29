@@ -1,8 +1,8 @@
 {
-  "versionCode": 3,
-  "versionName": "1.2",
-  "title": "LixfNet v1.2 - Giao diện Của tôi chuẩn Netflix",
-  "changelog": "• Thiết kế lại tab Của tôi chuẩn giao diện Netflix hiện đại\n• Đưa danh sách Tiếp tục xem lên đầu với nút phát và tùy chọn nhanh\n• Hỗ trợ chia sẻ phim và tối ưu trải nghiệm người dùng",
-  "apkUrl": "https://github.com/lichbich/LixfNet-App/releases/download/v1.2/LixfNet-v1.2.apk",
+  "versionCode": 4,
+  "versionName": "1.3",
+  "title": "LixfNet v1.3 - Đồng bộ TMDB & Tối ưu bảo mật",
+  "changelog": "• Đồng bộ chính thức TMDB API: Sửa lỗi poster, backdrop và tiêu đề trên toàn bộ các tab\n• Khắc phục hoàn toàn lỗi hiển thị thumbnail và ảnh tối màu\n• Tối ưu chữ ký Release bảo mật đạt chuẩn Google Play Protect\n• Tối ưu hiệu năng tải trang và trải nghiệm người dùng",
+  "apkUrl": "https://github.com/lichbich/LixfNet-App/releases/download/v1.3/LixfNet-v1.3.apk",
   "forceUpdate": false
 }
